@@ -1,0 +1,211 @@
+#####################################################################
+         GTOC4 Sims-Flanagan Low-Thrust Homotopy Instructions                  
+					Author: Yago Castilla Lamas
+			(yago.castilla-lamas@student.isae-supaero.fr)					
+						Date: 05/05/2025                             
+#####################################################################
+																   
+The code developped here has been designed to perform a low-thrust 
+homotopy of an asteroid tour using the Sims-Flanagan transcription.
+																   
+The workflow to use this code should be as follows. The first step is
+to design an initial guess for the asteroid tour. This initial guess
+should establish the asteroids that are to be visited and the order
+in which they are visited. Moreover, it is required to provide an
+initial guess for the dates in which each flyby is performed. This
+initial guess is usually obtained as by designing an impulsive
+trajectory with some additional constraints that mimic those of the
+low-thrust problem. Although other approches might be used for this
+purpose, this approach is commonly used because the design of an
+impulsive tour is much simpler than its design in low thrust and
+there are several analytical tools that can be used to ease the
+design procedure. An example on how to design such an initial guess
+can be seen on the work of García Mateas and Sánchez Cuartielles [1].
+
+The code applies the Sims-Flanagan transcription to the trajectory,
+optimizing the thrust profile and the flyby dates of the different
+asteroids to try and obtain a feasible or almost feasible low-thrust
+trajectory.                   
+																   
+The results can serve two purposes. In the first place, it can     
+directly discard tours if the results show that it is too far from
+being feasible. In the second place, the results can be used as an
+initial guess for a higher fidelity optimization tool such as GPOPS.
+The scripts here are written so that the output can be directly used
+in the GPOPS implementation designed by Andrea Ruscica.
+
+Each of the scripts and functions of the code has an introductory
+text explaining its purpose, input and output variables. Here,
+only a small explanation o how to use the main scripts to analyze a
+new proposed trajectory is written. However, to ensure a proper use
+of the code and a correct interpretation of the results, the reading
+of the description at the beginning of each of the main scripts
+is strongly recommended.
+
+More details on the methods used to implement the Sims-Flanagan
+transcription and perform the optimization of the trajectory can be
+found in the work for which this code was developed [2]. This work
+can be found in this same repository.
+
+Although the main use of this code is for the user to propose and
+test its own tours, there are 5 trajectories which are already
+implemented to be directly optimized so that the user can use them to
+test how the algorithm works.
+
+Final Remark: The algorithm is known to have robustness issues in the
+sense that a same initial guess can provide very different results in
+successive runs. More information on this can be found in [2].
+
+#####################################################################
+
+Folders:
+0.Auxiliar ---> This folder contains the functions used by the main
+				scripts.
+
+1.GTOC_Data ---> This folder contains the data of the GTOC problem,
+				 as well as the initial guesses for the tours.
+				 
+2.Mains ---> This folder contains the main scripts that should be used
+			 by the user.
+			
+3.Results ---> This folder allows to store the results of the
+			   optimization so it can be later loaded for different
+			   purposes such as analysis or reoptimization.
+			   
+#####################################################################
+
+MAIN SCRIPTS (found in 2.Mains folder):
+
+1)Full_Trajectory_Analysis.mat
+It is the most important script of the repository and it performs the
+optimization of the initial guess of the tour by optimizing its
+Sims-Flanagan transcription.
+
+2)ResultsAnalysis_GPOPSInitGuess.mat
+This script loads the results of the previous one. It allows the user
+to graphically assess the feasibility of the trajectory. Moreover, it
+generates a MATLAB structure wich contains an initial guess to be used
+on a higher fidelity optimizer such as GPOPS.
+
+3)Mass_Reoptimization.mat
+This script allows for the reoptimization of the trajectory
+maximizing the final mass of the spacecraft.
+ 
+#####################################################################
+
+How to analyze a new tour proposed by the user:
+
+1- Go to the "Data_GTOC4_Solution" script in the "GTOC_DATA" folder
+and add the data of the new proposed trajectory initial guess(i.e.,
+ordered asteroids and flyby dates initial guess) in the same form as
+it has been done for the already implemented trajectories.
+
+2- Open the "Main_GTOC4" script and change the flag in the second to
+last line to select the new trajectory. Run the code. Search the
+"Data" structure in the Workspace and save it in the "./1.GTOC_Data/
+TrajectoryInitGuess" folder with the name of your trajectory.
+
+3- Open the script named "Full_Trajectory_Analysis" in the "2.Mains"
+folder. Go to the code section named "Algorithm Options". Make sure
+that the "solution_index" variable is set to 6. Then, add the adress
+of the file generated in the previous step on the variable named
+"userInitGuess".
+
+4- In this same section choose the value of the different parameters
+controlling the behaviour of the algorithm (n_simul,
+asteroidsToRemove, kmax, max_rep, rho). The recommended values for
+these parameters can be found at the end of this document. Moreover,
+establish the name of the output file and the folder in which it
+should be stored in the variables named "resultsFileName" and
+"resultsAdress".
+
+5- Run the code. This step should take a longer computation time as
+it is where the optimization is performed. For a trajectory with 40
+to 50 asteroids with the recommended parameters the running time
+should be slightly under 2 hours.
+
+6- Once the execution is completed, search the structure named
+"sims_flanagan_trajectory" in the MATLAB workspace and store it in
+the results folder. it is possible to work with the results of an
+optimization without having to run it all over again.
+
+7- Open the script named "ResultsAnalysis_GPOPSInitGuess" in the
+"2.Mains" folder. In the "Input Files" section of the script make
+sure that the "solution_index" variable is set to 6. Write the
+adress of the initial guess file used to generate the solution in
+the "userInitGuess" variable (same thing as in step 3). Finally,
+write the adress of the file generated in step 6 in the
+"optimization_results" variable.
+
+8- Run the script. Three figures will be displayed. The first one
+shows the commanded mean thrust along the trajectory. The red dashed
+lines represent each of the flybys and the blue line represents the
+maximum available thrust. If the commanded thrust is above this
+line, the trajectory is not feasible. The second figure shows the
+evolution of the mass of the spacecraft along the trajectory. In
+this case, the blue dashed line represents the empty mass of the
+spacecraft. For the trajectory to be feasible, the mass of the
+spacecraft should remain above this line for the full trajectory.
+Finally, the third figure shows a 3D view of the trajectory. The
+generated structure named "sol_guess" contains the data to be
+inputed as initial guess to a higher fidelity solver.
+
+9- The implementation of "Full_Trajectory_Analysis" do not optimize
+the final mass of the spacecraft. Therefore, it is possible that
+the resulting solution is feasible in terms of thrust but not in
+terms of mass. Then, the user can choose to reoptimize the solution
+to maximize the final mass of the spacecraft using the "Mass_
+Reoptimization" script in the "2.Mains" folder. To run this script
+follow these steps:
+
+	9.1 - Open the script
+	
+	9.2 - Set "solution_index" to 6 and set the path on the
+		  "userInitGuess" variable to point the file containing the
+		  initial guess (as in steps 3 and 7).
+		  
+	9.3 - Set the path in the "optimization_results" variable to
+		  point to the results file generated in step 6 (as it was
+		  done in step 7).
+		  
+	9.4 - Set the name and adress of the results file (as it was
+		  done in step 4).
+		  
+	9.5 - Set the value of the n_simul variable (the recommended
+		  value is 2).
+		  
+	9.6 - Run the script
+	
+10- Once the execution is completed, search the structure named
+"sims_flanagan_trajectory" in the MATLAB workspace and store it in
+the results folder (as in step 6). These results can be analyzed
+using the "ResultsAnalysis_GPOPSInitGuess" script in the exact same
+way as it has been described for the results of the "Full_Trajectory
+_Analysis" script (steps 7 and 8).
+
+#####################################################################
+
+Recommended values for the variables controlling the algorithm
+options (to be used in the "Algorithm Options" section of the
+"Full_Trajectory_Analysis" script):
+
+n_i = 10;
+
+n_simul = 2;
+
+kmax = 50;
+
+max_rep = 5;
+
+rho = 0.15;
+
+#####################################################################
+
+References
+[1] J. C. G. Mateas and J. P. S. Cuartielles, “Low-thrust automated
+asteroid tour trajectory design via dynamic programming,” in AAS
+23-217, AAS/AIAA Astrodynamics Specialist Conference, Big Sky,
+Montana, Aug. 13–17, 2023.
+
+[2] Yago Castilla Lamas, "Feasibility Assessment of Low-Thrust Multi-
+Target Trajectories via Sims-Flanagan Transcription. 2025.
