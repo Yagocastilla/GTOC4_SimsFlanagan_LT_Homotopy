@@ -10,7 +10,7 @@ function [current_best,opt_results] = MBH(objFunction,constraintFunction,initGue
 
     % Store the initial guess
     opt_results.best_ev(1) = objFunction(initGuess);
-    opt_results.best_constr(1) = constraintFunction(initGuess);
+    opt_results.best_constr(1) = max(constraintFunction(initGuess));
     
     %First local optimization
     [opt_solution, fout] = fmincon(objFunction,initGuess,[],[],[],[],infBounds,supBounds,constraintFunction,opt_options);
@@ -20,7 +20,7 @@ function [current_best,opt_results] = MBH(objFunction,constraintFunction,initGue
     rep = 0;
     current_best = opt_solution;
     current_best_value = fout;
-    current_best_constraint = constraintFunction(current_best);
+    current_best_constraint = max(constraintFunction(current_best));
     opt_results.best_ev(2) = current_best_value;
     opt_results.best_constr(2) = current_best_constraint;
     while j<kmax
@@ -45,19 +45,19 @@ function [current_best,opt_results] = MBH(objFunction,constraintFunction,initGue
     
         %If a better solution is found, update the result
         if current_best_constraint<=1e-3
-            if fout < current_best_value && constraintFunction(opt_solution)<=1e-3
+            if fout < current_best_value && max(constraintFunction(opt_solution))<=1e-3
                 current_best = opt_solution;
                 current_best_value = fout;
-                current_best_constraint = constraintFunction(opt_solution);
+                current_best_constraint = max(constraintFunction(opt_solution));
                 rep = 0;
             else
                 rep = rep + 1;
             end
         else
-            if constraintFunction(opt_solution) < current_best_constraint
+            if max(constraintFunction(opt_solution)) < current_best_constraint
                 current_best = opt_solution;
                 current_best_value = fout;
-                current_best_constraint = constraintFunction(opt_solution);
+                current_best_constraint = max(constraintFunction(opt_solution));
                 rep = 0;
             else
                 rep = rep + 1;
