@@ -183,6 +183,7 @@ addpath("../0.Auxiliar/Transcription_Specifics")
 addpath("../0.Auxiliar/Transformations")
 addpath("../0.Auxiliar/1-ISF_Transcription")
 addpath("../0.Auxiliar/SF_Multiple_Impulses")
+addpath("../0.Auxiliar/MBH")
 
 %Load GTOC problem data
 pars = load("../1.GTOC_Data/pars.mat").pars;
