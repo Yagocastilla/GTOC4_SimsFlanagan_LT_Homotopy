@@ -338,8 +338,8 @@ try
             %Check if the orbit is hyperbolic
             [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
             if e>1
-                c = errorValue;
-                ceq = errorValue;
+                c = errorValue*ones(1,n_arcs*n_i);
+                ceq = errorValue*ones(1,3);
                 return
             end
         
@@ -360,8 +360,8 @@ try
         %Check if the orbit is hyperbolic
         [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
         if e>1
-            c = errorValue;
-            ceq = errorValue;
+            c = errorValue*ones(1,n_arcs*n_i);
+            ceq = errorValue*ones(1,3);
             return
         end
 
@@ -392,17 +392,17 @@ try
     end
     
     %Compute the maximum impulse
-    max_thrust = max(thrust,[],"all");
+    reshapedThrust = reshape(thrust,1,n_arcs*n_i);
 
     %Inequality constraint
-    c = max_thrust - T_limit;
+    c = reshapedThrust - T_limit;
 
     %Final velocity constraint
-    ceq = norm(v_vec - req_v_fin);
+    ceq = v_vec - req_v_fin;
 
 catch
-    c = errorValue;
-    ceq = errorValue;
+    c = errorValue*ones(1,n_arcs*n_i);
+    ceq = errorValue*ones(1,3);
 end
 
 end

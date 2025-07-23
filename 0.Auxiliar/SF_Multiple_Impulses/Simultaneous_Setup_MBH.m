@@ -124,7 +124,7 @@ finalVelError = @(T_vector)sim_PostInitError(r_ini,v_ini,r_obj,v_fin,ToFs,initMa
 constraint = @(T_vector)thrustConstraint(r_ini,v_ini,r_obj,ToFs,initMass,T_limit,T_vector,adim_pars);
 
 %Penalized objective function
-penalObj = @(opt_T_vector)finalVelError(opt_T_vector) + 1e3*max(0, constraint(opt_T_vector));
+penalObj = @(opt_T_vector)finalVelError(opt_T_vector) + 1e3*max([0, constraint(opt_T_vector)]);
 
 %Compute the maximum thrust for the initial guess
 thrustMagnitudes = zeros(n_i,n_arcs);
@@ -144,34 +144,39 @@ else
     bounds = T_limit*ones(1,n_arcs*N*3);
 end
 
+opt_results.initValue = finalVelError(T_0);
+opt_results.initConstraint = max(constraint(T_0));
+
 %If not feasible, try a first optimization
 if maxThrust > T_limit
-    opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
-                           MaxIterations = 1e6);
-    T_0_x = fmincon(@(x)0,T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
+    [T_0_x,opt_results.InitMBHResults] = MBH(@(x)0,constraint,T_0,-bounds,bounds,kmax,rho,max_rep,1);
 else
     T_0_x = T_0;
 end
 
+opt_results.localFeasibleValue = finalVelError(T_0_x);
+opt_results.localFeasibleConstraint = max(constraint(T_0_x));
+
 %If still not feasible, try with GA
-ineq = constraint(T_0_x);
+ineq = max(constraint(T_0_x));
 if ineq>1e-3
     GA_finalVelError = @(T_vector)GA_PostInitError(r_ini,v_ini,r_obj,v_fin,ToFs,initMass,T_limit,T_vector,adim_pars);
     ga_options = optimoptions("ga",'Display', 'iter',PlotFcn = @gaplotbestf,InitialPopulationMatrix = T_0_x);
     opt_T_0 = ga(GA_finalVelError,length(T_0),[],[],[],[],-bounds,bounds,[],ga_options);
+    opt_results.gaActivated = 1;
 
-    %If still not feasible, aditional optimization step
-    ineq = constraint(opt_T_0);
-    if ineq>1e-3
-        opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
-                               MaxIterations = 1e6);
-        opt_T_0 = fmincon(@(x)0,opt_T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
-    end
+    opt_results.GAValue = finalVelError(opt_T_0);
+    opt_results.GAConstraint = max(constraint(opt_T_0));
+    
 else
     opt_T_0 = T_0_x;
+    opt_results.gaActivated = 0;
 end
 
-[current_best,opt_results] = MBH(penalObj,constraint,opt_T_0,-bounds,bounds,kmax,rho,max_rep);
+[current_best,opt_results.MBHResults] = MBH(penalObj,constraint,opt_T_0,-bounds,bounds,kmax,rho,max_rep);
+
+opt_results.MBHValue = finalVelError(current_best);
+opt_results.MBHConstraint = max(constraint(current_best));
 
 %% Results
 
@@ -347,7 +352,7 @@ try
             %Check if the orbit is hyperbolic
             [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
             if e>1
-                c = errorValue;
+                c = errorValue*ones(1,n_arcs*n_i);
                 return
             end
         
@@ -368,7 +373,7 @@ try
         %Check if the orbit is hyperbolic
         [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
         if e>1
-            c = errorValue;
+            c = errorValue*ones(1,n_arcs*n_i);
             return
         end
 
@@ -398,14 +403,14 @@ try
         SCMass = updateArcMass(impulses(:,:,l),SCMass,pars);
     end
     
-    %Compute the maximum impulse
-    max_thrust = max(thrust,[],"all");
+    %Reshape the thrust matrix
+    reshapedThrust = reshape(thrust,1,n_arcs*n_i);
 
-    %Inequality constraint
-    c = max_thrust - T_limit;
+    %Inequality constraints
+    c = reshapedThrust - T_limit;
 
 catch
-    c = errorValue;
+    c = errorValue*ones(1,n_arcs*n_i);
 end
 
 end
