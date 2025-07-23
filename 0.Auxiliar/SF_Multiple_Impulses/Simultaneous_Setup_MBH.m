@@ -149,9 +149,7 @@ opt_results.initConstraint = max(constraint(T_0));
 
 %If not feasible, try a first optimization
 if maxThrust > T_limit
-    opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
-                           MaxIterations = 1e6);
-    T_0_x = fmincon(@(x)0,T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
+    [T_0_x,opt_results.InitMBHResults] = MBH(@(x)0,constraint,T_0,-bounds,bounds,kmax,rho,max_rep,1);
 else
     T_0_x = T_0;
 end
@@ -169,95 +167,13 @@ if ineq>1e-3
 
     opt_results.GAValue = finalVelError(opt_T_0);
     opt_results.GAConstraint = max(constraint(opt_T_0));
-
-    %If still not feasible, aditional optimization step
-    ineq = max(constraint(opt_T_0));
-    if ineq>1e-3
-        opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
-                               MaxIterations = 1e6);
-        opt_T_0 = fmincon(@(x)0,opt_T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
-
-        opt_results.afterGAValue = finalVelError(opt_T_0);
-        opt_results.afterGAConstraint = max(constraint(opt_T_0));
-    end
+    
 else
     opt_T_0 = T_0_x;
     opt_results.gaActivated = 0;
 end
 
-%Set the local optimization algorithm options
-opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 5e4,...
-                           MaxIterations = 1e6);
-
-%First local optimization
-[opt_solution, fout] = fmincon(penalObj,opt_T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
-
-%Variable to store current best
-opt_results.best_ev = zeros(1,kmax+1);
-opt_results.best_constr = zeros(1,kmax+1);
-
-%Monotonic basin hopping loop
-j = 0;
-rep = 0;
-current_best = opt_solution;
-current_best_value = fout;
-current_best_constraint = max(constraint(current_best));
-opt_results.best_ev(1) = current_best_value;
-opt_results.best_constr(1) = current_best_constraint;
-while j<kmax
-    %Generate the random perturbation vector [-rho, rho]
-    pert = zeros(size(opt_solution));
-    for l=1:length(pert)
-        if current_best(l) == 0
-            pert(l) = (2*rand-1)*rho;
-        else
-            pert(l) = (2*rand-1)*rho*current_best(l);
-        end
-    end
-
-    %Generate new initial guess
-    new_guess = current_best + pert;
-
-    %Local Optimization Algorithm
-    [opt_solution, fout] = fmincon(penalObj,new_guess,[],[],[],[],-bounds,bounds,constraint,opt_options);
-
-    %Update counter of local runs
-    j = j + 1;
-
-    %If a better solution is found, update the result
-    if current_best_constraint<=1e-3
-        if fout < current_best_value && max(constraint(opt_solution))<=1e-3
-            current_best = opt_solution;
-            current_best_value = fout;
-            current_best_constraint = max(constraint(opt_solution));
-            rep = 0;
-        else
-            rep = rep + 1;
-        end
-    else
-        if max(constraint(opt_solution)) < current_best_constraint
-            current_best = opt_solution;
-            current_best_value = fout;
-            current_best_constraint = max(constraint(opt_solution));
-            rep = 0;
-        else
-            rep = rep + 1;
-        end
-    end
-
-    %Save current best
-    opt_results.best_ev(j+1) = current_best_value;
-    opt_results.best_constr(j+1) = current_best_constraint;
-
-    %After the specified runs, if no improvement is found, stop the algorithm
-    if rep == max_rep
-        break
-    end
-end
-
-%Store the results of the optimization
-opt_results.local_runs = j+1;
-opt_results.repeats = rep;
+[current_best,opt_results.MBHResults] = MBH(penalObj,constraint,opt_T_0,-bounds,bounds,kmax,rho,max_rep);
 
 opt_results.MBHValue = finalVelError(current_best);
 opt_results.MBHConstraint = max(constraint(current_best));
