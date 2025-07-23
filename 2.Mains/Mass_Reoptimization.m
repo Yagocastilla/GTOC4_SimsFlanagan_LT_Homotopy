@@ -94,11 +94,11 @@ userInitGuess = "../1.GTOC_Data/TrajectoryInitGuess/EDep12_Tour_10.mat";
 
 %File with the optimization results
 %(the structure called sims_flanagan_trajectory)
-optimization_results = "../3.Results/Original_Moscow/Original_Moscow.mat";
+optimization_results = "../3.Results/Original_Moscow/Original_Moscow_NewTConstraint.mat";
 
 %Adress to store the results and file name
 resultsAdress = "../3.Results/Original_Moscow";
-resultsFileName = "Original_Moscow_MassReopt.mat";
+resultsFileName = "Original_Moscow_NewTConstraint_MassReopt.mat";
 
 %Number of arcs simultaneously reoptimized
 n_simul = 2;

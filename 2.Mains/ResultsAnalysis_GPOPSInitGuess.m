@@ -185,7 +185,7 @@ clear; close all; clc;
 
 %Select solution to be converted (set to 6 for a new trajectory defined by
 %the user)
-solution_index = 4;
+solution_index = 3;
 
 %Adress of the file containing the user's initial guess data (only used if
 %"solution_index" has been set to 6)
@@ -193,7 +193,7 @@ userInitGuess = "../1.GTOC_Data/TrajectoryInitGuess/EDep12_Tour_10.mat";
 
 %File with the optimization results
 %(the structure called sims_flanagan_trajectory)
-optimization_results = "../3.Results/Original_Moscow/Original_Moscow_MassReopt.mat";
+optimization_results = "../3.Results/Johnson/Johnson_InitMBH_Final.mat";
 
 %% Load GTOC data and trajectory
 

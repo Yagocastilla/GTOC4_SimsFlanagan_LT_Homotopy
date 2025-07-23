@@ -114,7 +114,7 @@ end
 %ga_options = optimoptions("ga",'Display', 'iter',PlotFcn = @gaplotbestf);
 ga_options = optimoptions("ga");
 if norm(lamb_impulse)/adim_pars.ref_velocity < 0.01*dv_limit
-    opt_dv_0 = ga(finalVelError,length(opt_dv_0),[],[],[],[],-bounds,bounds,constraint,ga_options);
+%    opt_dv_0 = ga(finalVelError,length(opt_dv_0),[],[],[],[],-bounds,bounds,constraint,ga_options);
 end
 
 %Set optimization algorithm options

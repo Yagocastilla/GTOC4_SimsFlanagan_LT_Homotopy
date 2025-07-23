@@ -1,19 +1,19 @@
-function impulses = Mass_Simultaneous_NLP(r_ini,v_ini,r_obj,req_v_fin,ToFs, ...
-                                           initMass,init_guess,n_i,T_limit,pars)
+function [impulses, opt_results] = Simultaneous_Setup_MBH(r_ini,v_ini,...
+      r_obj,v_fin,ToFs,initMass,init_guess,n_i,T_limit,pars,kmax,rho,max_rep)
 
 %{
 ###########################################################################
-            Simultaneous Optimization of Several Arcs Setup + NLP
+            Simultaneous Optimization of Several Arcs Setup + MBH
                         Author: Yago Castilla Lamas
 ###########################################################################
 
 This function takes several arcs (optimization window) of the trajectory
 and optimizes them to minimize the maximum mean thrust of the whole
 optimization window. The number of arcs in the optimization window is
-denoted nsimul. The final impulse of each arc is computed by solving a
+denoted nsimul The final impulse of each arc is computed by solving a
 lambert's problem that automatically satisfies the constraints of the
-flyby as in the FLI setup. The optimization problem is solved through a NLP
-algorithm.
+flyby as in the FLI setup. The optimization problem is solved through the
+MBH algorithm.
 
 The algorithm requires a initial guess that has to be provided through the
 "init guess" parameter. This initial guess is formed by the impulses
@@ -94,7 +94,7 @@ adim_pars.SC.Isp = pars.SC.Isp/adim_pars.ref_time;
 r_ini = r_ini/adim_pars.ref_distance;
 v_ini = v_ini/adim_pars.ref_velocity;
 r_obj = r_obj./adim_pars.ref_distance;
-req_v_fin = req_v_fin/adim_pars.ref_velocity;
+v_fin = v_fin/adim_pars.ref_velocity;
 ToFs = ToFs/adim_pars.ref_time;
 initMass = initMass/adim_pars.ref_mass;
 init_guess = init_guess./adim_pars.ref_velocity;
@@ -118,13 +118,13 @@ for l=1:n_arcs
 end
 
 %Set objective function
-totalDeltaV = @(T_vector)sim_totalImpulse(r_ini,v_ini,r_obj,ToFs,initMass,T_vector,adim_pars);
+finalVelError = @(T_vector)sim_PostInitError(r_ini,v_ini,r_obj,v_fin,ToFs,initMass,T_vector,adim_pars);
 
 %Set the non-linear inequality constraint
-constraint = @(T_vector)thrustConstraint(r_ini,v_ini,r_obj,req_v_fin,ToFs,initMass,T_limit,T_vector,adim_pars);
+constraint = @(T_vector)thrustConstraint(r_ini,v_ini,r_obj,ToFs,initMass,T_limit,T_vector,adim_pars);
 
 %Penalized objective function
-penalObj = @(T_vector)totalDeltaV(T_vector) ;%+ 1e3 * norm(getEqualityConstraint(r_ini,v_ini,r_obj,req_v_fin,ToFs,initMass,T_limit,T_vector,adim_pars));
+penalObj = @(opt_T_vector)finalVelError(opt_T_vector) + 1e3*max(0, constraint(opt_T_vector));
 
 %Compute the maximum thrust for the initial guess
 thrustMagnitudes = zeros(n_i,n_arcs);
@@ -144,23 +144,51 @@ else
     bounds = T_limit*ones(1,n_arcs*N*3);
 end
 
-%{
+opt_results.initValue = finalVelError(T_0);
+opt_results.initConstraint = constraint(T_0);
+
 %If not feasible, try a first optimization
 if maxThrust > T_limit
-    opt_options = optimoptions("fmincon", MaxFunctionEvaluations = 1e5,...
+    opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
                            MaxIterations = 1e6);
-    opt_T_0 = fmincon(@(x)0,T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
+    T_0_x = fmincon(@(x)0,T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
 else
-    opt_T_0 = T_0;
+    T_0_x = T_0;
 end
-%}
 
-%Set optimization algorithm options
-opt_options = optimoptions("fmincon", MaxFunctionEvaluations = 5e5,...
-                           MaxIterations = 1e6);
+opt_results.localFeasibleValue = finalVelError(T_0_x);
+opt_results.localFeasibleConstraint = constraint(T_0_x);
 
-%Solve the Optimization Problem
-opt_results = fmincon(penalObj,T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
+%If still not feasible, try with GA
+ineq = constraint(T_0_x);
+if ineq>1e-3
+    GA_finalVelError = @(T_vector)GA_PostInitError(r_ini,v_ini,r_obj,v_fin,ToFs,initMass,T_limit,T_vector,adim_pars);
+    ga_options = optimoptions("ga",'Display', 'iter',PlotFcn = @gaplotbestf,InitialPopulationMatrix = T_0_x);
+    opt_T_0 = ga(GA_finalVelError,length(T_0),[],[],[],[],-bounds,bounds,[],ga_options);
+    opt_results.gaActivated = 1;
+
+    opt_results.GAValue = finalVelError(opt_T_0);
+    opt_results.GAConstraint = constraint(opt_T_0);
+
+    %If still not feasible, aditional optimization step
+    ineq = constraint(opt_T_0);
+    if ineq>1e-3
+        opt_options = optimoptions("fmincon", Algorithm = 'sqp', MaxFunctionEvaluations = 1e5,...
+                               MaxIterations = 1e6);
+        opt_T_0 = fmincon(@(x)0,opt_T_0,[],[],[],[],-bounds,bounds,constraint,opt_options);
+
+        opt_results.afterGAValue = finalVelError(opt_T_0);
+        opt_results.afterGAConstraint = constraint(opt_T_0);
+    end
+else
+    opt_T_0 = T_0_x;
+    opt_results.gaActivated = 0;
+end
+
+[current_best,opt_results.MBH] = MBH(penalObj,constraint,opt_T_0,-bounds,bounds,kmax,rho,max_rep);
+
+opt_results.MBHValue = finalVelError(current_best);
+opt_results.MBHConstraint = constraint(current_best);
 
 %% Results
 
@@ -174,7 +202,7 @@ SCMass = initMass;
 r_vec = r_ini; v_vec = v_ini;
 for l=1:n_arcs
     %Reshape the thrusts and convert to impulses
-    thrusts_arc = opt_results(((l-1)*N*3+1:l*N*3));
+    thrusts_arc = current_best(((l-1)*N*3+1:l*N*3));
     for k=1:N
         impulses.vector(k,:,l) = thrusts_arc((k-1)*3+1:k*3).*(ToFs(l)/n_i)./SCMass;
     end
@@ -213,7 +241,7 @@ end
 
 %% FUNCTIONS
 
-function totalDeltaV = sim_totalImpulse(r_vec,v_vec,r_obj,ToFs,initMass,T_vector,pars)
+function finalVel_Diff = sim_PostInitError(r_vec,v_vec,r_obj,v_fin,ToFs,initMass,T_vector,pars)
 
 %Number of arcs, optimization impulses per arc and impulses
 n_arcs = length(ToFs); N = length(T_vector)/n_arcs/3; n_i = N + 1;
@@ -251,7 +279,7 @@ try
             %Check if the orbit is hyperbolic
             [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
             if e>1
-                totalDeltaV = errorValue;
+                finalVel_Diff = errorValue;
                 return
             end
         
@@ -272,7 +300,7 @@ try
         %Check if the orbit is hyperbolic
         [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
         if e>1
-            totalDeltaV = errorValue;
+            finalVel_Diff = errorValue;
             return
         end
 
@@ -283,24 +311,22 @@ try
         SCMass = updateArcMass(impulses(:,:,l),SCMass,pars);
     end
     
-    %Compute the provided total impulse
-    magnitudes = zeros(n_i,n_arcs);
-    for l=1:n_arcs
-        for k=1:n_i
-            magnitudes(k,l) = norm(impulses(k,:,l));
-        end
-    end
-    totalDeltaV = sum(magnitudes, "all");
+    %Compute the norm of the difference between the actual final velocity
+    %and the desired one
+    finalVel_Diff = norm(v_vec - v_fin);
 
 catch
-    totalDeltaV = errorValue;
+    finalVel_Diff = errorValue;
 end
 
 end
 
 %#########################################################################%
 
-function [c,ceq] = thrustConstraint(r_vec,v_vec,r_obj,req_v_fin,ToFs,initMass,T_limit,T_vector,pars)
+function [c,ceq] = thrustConstraint(r_vec,v_vec,r_obj,ToFs,initMass,T_limit,T_vector,pars)
+
+%No equality constraint
+ceq = 0;
 
 %Number of arcs, optimization impulses per arc and impulses
 n_arcs = length(ToFs); N = length(T_vector)/n_arcs/3; n_i = N + 1;
@@ -338,8 +364,7 @@ try
             %Check if the orbit is hyperbolic
             [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
             if e>1
-                c = errorValue*ones(1,n_arcs*n_i);
-                ceq = errorValue*ones(1,3);
+                c = errorValue;
                 return
             end
         
@@ -360,8 +385,7 @@ try
         %Check if the orbit is hyperbolic
         [~, e, ~, ~, ~, ~] = Build_OE(r_vec, v_vec, pars.mu_sun);
         if e>1
-            c = errorValue*ones(1,n_arcs*n_i);
-            ceq = errorValue*ones(1,3);
+            c = errorValue;
             return
         end
 
@@ -392,17 +416,13 @@ try
     end
     
     %Compute the maximum impulse
-    reshapedThrust = reshape(thrust,1,n_arcs*n_i);
+    max_thrust = max(thrust,[],"all");
 
     %Inequality constraint
-    c = reshapedThrust - T_limit;
-
-    %Final velocity constraint
-    ceq = v_vec - req_v_fin;
+    c = max_thrust - T_limit;
 
 catch
-    c = errorValue*ones(1,n_arcs*n_i);
-    ceq = errorValue*ones(1,3);
+    c = errorValue;
 end
 
 end
@@ -517,8 +537,4 @@ catch
     finalVel_Diff = errorValue;
 end
 
-end
-
-function ceq = getEqualityConstraint(r_ini,v_ini,r_obj,req_v_fin,ToFs,initMass,T_limit,T_vector,pars)
-    [~, ceq] = thrustConstraint(r_ini,v_ini,r_obj,req_v_fin,ToFs,initMass,T_limit,T_vector,pars);
 end

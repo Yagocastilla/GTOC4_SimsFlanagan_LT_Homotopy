@@ -1,0 +1,51 @@
+function [impulses, opt_results] = simultaneousSetupTest(sfTranscription,trajectory,pars)
+
+% Number of simultaneous arcs
+arcNames = fieldnames(sfTranscription);
+n_arcs = length(arcNames);
+
+% Initial position and velocity
+r_ini = trajectory.state(1,1:3,1);
+v_ini = trajectory.state(1,4:6,1);
+v_ini(1) = v_ini(1) + 0.0003; v_ini(3) = v_ini(3) + 0.0005;
+
+% Objective vector
+r_obj = zeros(n_arcs,3);
+for k = 1:n_arcs
+    r_obj(k,:) = trajectory.state(1,1:3,k+1);
+end
+
+% Final velocity
+v_fin = trajectory.state(1,4:6,end);
+%v_fin(1) = v_fin(1); v_fin(3) = v_fin(3);
+
+% ToFs
+ToFs = zeros(1,2);
+for k =1:n_arcs
+    ToFs(k) = trajectory.times(end,1,k) - trajectory.times(1,1,k);
+end
+
+% Initial mass
+initMass = trajectory.mass(1,1,1);
+
+% Number of impulses per leg
+n_i = size(sfTranscription.(arcNames{1}).vector,1);
+
+% Get the impulses matrix
+init_guess = zeros(n_i,3,n_arcs); 
+for l=1:n_arcs
+    init_guess(:,:,l) = sfTranscription.(arcNames{l}).vector;
+end
+
+% Define the maximum thrust
+T_limit = pars.SC.T;
+
+% MBH parameters
+kmax = 50; %Maximum number of local runs
+max_rep = 5; %Maximum number of local runs without improvement
+rho = 0.15; %Maximum percentage of change
+
+[impulses, opt_results] = Simultaneous_Setup_MBH_OriginalConstraint(r_ini,v_ini,...
+      r_obj,v_fin,ToFs,initMass,init_guess,n_i,T_limit,pars,kmax,rho,max_rep);
+
+end

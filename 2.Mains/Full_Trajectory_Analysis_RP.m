@@ -172,8 +172,8 @@ max_rep = 5; %Maximum number of local runs without improvement
 rho = 0.15; %Maximum percentage of change
 
 %Adress to store the results and file name
-resultsAdress = "../3.Results/Original_Moscow";
-resultsFileName = "Original_Moscow_InitMBH_Final";
+resultsAdress = "../3.Results";
+resultsFileName = "Original_Moscow_RP.mat";
 
 %% Load GTOC data and trajectory initial guess
 
@@ -456,7 +456,7 @@ for arc_i=n_simul:n_arcs-1
     comb_guess = impulses(:,:,arc_i-(n_simul-1):arc_i); %Initial guess for the impulses
 
     %Optimization of the optimization window (MBH algorithm)
-    [combined_sims_flanagan,opt_results_SF] = Simultaneous_Setup_MBH_InitMBH(r_ini,v_ini,r_obj,VI_post,arc_ToFs,initMass,comb_guess,n_i,pars.SC.T,pars,kmax,rho,max_rep);
+    [combined_sims_flanagan,opt_results_SF] = Simultaneous_Setup_MBH_RP(r_ini,v_ini,r_obj,VI_post,arc_ToFs,initMass,comb_guess,n_i,pars.SC.T,pars,kmax,rho,max_rep);
     opt_results.(sprintf("Arc%d",arc_i-n_simul+1)) = opt_results_SF;
 
     %Store the results
@@ -505,7 +505,7 @@ arc_ToFs = Upd_ToFs(n_arcs+1-n_simul:n_arcs); %Extract the time of flight of the
 initMass = arc_mass(n_arcs+1-n_simul); %Extract the SC masses at each arc in the optimization window
 comb_guess = impulses(:,:,n_arcs-(n_simul-1):n_arcs); %Initial guess for the impulses
 
-combined_sims_flanagan = Simultaneous_Setup_MBH_InitMBH(r_ini,v_ini,r_obj,v_finalAsteroid,arc_ToFs,initMass,comb_guess,n_i,pars.SC.T,pars,kmax,rho,max_rep);
+combined_sims_flanagan = Simultaneous_Setup_MBH_RP(r_ini,v_ini,r_obj,v_finalAsteroid,arc_ToFs,initMass,comb_guess,n_i,pars.SC.T,pars,kmax,rho,max_rep);
 
 impulses(:,:,n_arcs-(n_simul-1):n_arcs) = combined_sims_flanagan.vector;
 times(:,n_arcs-(n_simul-1):n_arcs) = combined_sims_flanagan.times;
@@ -536,7 +536,7 @@ sims_flanagan_trajectory.optTime = executionTime;
 SaveAdress = fullfile(resultsAdress, resultsFileName);
 save(SaveAdress, "sims_flanagan_trajectory");
 
-SaveAdressOpt = fullfile(resultsAdress, "optimizationResults");
+SaveAdressOpt = fullfile(resultsAdress, "optimizationResults_RP");
 save(SaveAdressOpt, "opt_results");
 
 %% FUNCTIONS

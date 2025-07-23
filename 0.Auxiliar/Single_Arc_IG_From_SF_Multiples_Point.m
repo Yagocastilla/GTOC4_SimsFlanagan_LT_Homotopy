@@ -16,7 +16,7 @@ value of the thrust is provided in a zero order hold form. That is, up
 until the next node, the thrust is considered constant and equal to the
 value provided in the initial node of the current segment.
 
-The trajectory, on the other hand, is computed applying the instataneous
+The trajectory, on the other hand, is computed applying the instantaneous
 impulses and propagating the trajectory as a keplerian motion. The mass is
 updated after each segment using tschiolkovsky's equation and this is the
 one used to compute the thrust of the next segment.
