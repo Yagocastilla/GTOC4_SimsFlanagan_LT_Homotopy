@@ -339,11 +339,19 @@ end
 %Optimize the first n_simul-1 arcs in an isolated way to obtain initial
 %guess for the first optimization window.
 for arc_i=1:n_simul-1
+    % Check if the dates optimization window exceeds the legth of the
+    % solution
+    if nArcsDateOpt > n_arcs-arc_i+1
+        actual_nArcsOpt = n_arcs-arc_i+1;
+    else
+        actual_nArcsOpt = nArcsDateOpt;
+    end
+
     %Optimize the dates of the remaining arcs using the 1-ISF transcription
-    modSolution = One_ISF_ModifyDates(arc_i,v_vec,arc_mass(arc_i),nArcsDateOpt,Asteroids_OE,modSolution,pars);
+    modSolution = One_ISF_ModifyDates(arc_i,v_vec,arc_mass(arc_i),actual_nArcsOpt,Asteroids_OE,modSolution,pars);
 
     %Update the times of flight
-    for arc_k=arc_i:arc_i+nArcsDateOpt-1
+    for arc_k=arc_i:arc_i+actual_nArcsOpt-1
         if arc_k == 1
             Upd_ToFs(arc_k) = (modSolution.Flyby_Dates(arc_k)-modSolution.Launch_Date)*86400;
         else
@@ -352,7 +360,7 @@ for arc_i=1:n_simul-1
     end
 
     %Update the flyby positions
-    for flyby=arc_i:arc_i+nArcsDateOpt-1
+    for flyby=arc_i:arc_i+actual_nArcsOpt-1
         Upd_r_flybys(flyby,:) = CartesianState(table2array(Asteroids_OE(flyby,:)), (modSolution.Flyby_Dates(flyby)-pars.Epoch.Asteroid_Ephem)*86400, pars);
     end
 
